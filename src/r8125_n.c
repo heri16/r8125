@@ -4,7 +4,7 @@
 # r8125 is the Linux device driver released for Realtek 2.5Gigabit Ethernet
 # controllers with PCI-Express interface.
 #
-# Copyright(c) 2018 Realtek Semiconductor Corp. All rights reserved.
+# Copyright(c) 2019 Realtek Semiconductor Corp. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify it
 # under the terms of the GNU General Public License as published by the Free
@@ -2568,7 +2568,7 @@ rtl8125_switch_to_timer_interrupt(struct rtl8125_private *tp, void __iomem *ioad
         if (tp->use_timer_interrrupt) {
                 RTL_W32(TIMER_INT0_8125, timer_count);
                 RTL_W32(TCTR0_8125, timer_count);
-                RTL_W32(IMR0_8125, tp->intr_mask);
+                RTL_W32(IMR0_8125, tp->timer_intr_mask);
 
 #ifdef ENABLE_DASH_SUPPORT
                 if (tp->DASH)
@@ -3065,11 +3065,6 @@ rtl8125_enable_pci_offset_180(struct rtl8125_private *tp)
         switch (tp->mcfg) {
         case CFG_METHOD_2:
         case CFG_METHOD_3:
-                csi_tmp = rtl8125_mac_ocp_read(tp, 0xE098);
-                csi_tmp &= 0x000F;
-                csi_tmp |= (0x0640);
-                rtl8125_mac_ocp_write(tp, 0xE098, csi_tmp);
-
                 csi_tmp = rtl8125_mac_ocp_read(tp, 0xE094);
                 csi_tmp &= 0x00FF;
                 rtl8125_mac_ocp_write(tp, 0xE094, csi_tmp);
@@ -3160,9 +3155,15 @@ rtl8125_hw_d3_para(struct net_device *dev)
                 break;
         }
 
-        if (tp->mcfg == CFG_METHOD_2 ||
-            tp->mcfg == CFG_METHOD_3) {
+#ifdef ENABLE_REALWOW_SUPPORT
+        rtl8125_set_realwow_d3_para(dev);
+#endif
+
+        switch (tp->mcfg) {
+        case CFG_METHOD_2:
+        case CFG_METHOD_3:
                 rtl8125_mac_ocp_write(tp, 0xEA18, 0x0064);
+                break;
         }
 
         rtl8125_set_pci_99_180_exit_driver_para(dev);
@@ -4772,6 +4773,18 @@ rtl8125_exit_oob(struct net_device *dev)
 #endif
         }
 
+#ifdef ENABLE_REALWOW_SUPPORT
+        rtl8125_realwow_hw_init(dev);
+#else
+        //Disable realwow  function
+        switch (tp->mcfg) {
+        case CFG_METHOD_2:
+        case CFG_METHOD_3:
+                rtl8125_mac_ocp_write(tp, 0xC0BC, 0x00FF);
+                break;
+        }
+#endif //ENABLE_REALWOW_SUPPORT
+
         rtl8125_nic_reset(dev);
 
         switch (tp->mcfg) {
@@ -4847,6 +4860,126 @@ rtl8125_hw_disable_mac_mcu_bps(struct net_device *dev)
 }
 
 static void
+rtl8125_set_mac_mcu_8125a_2(struct net_device *dev)
+{
+        struct rtl8125_private *tp = netdev_priv(dev);
+
+        rtl8125_hw_disable_mac_mcu_bps(dev);
+
+        rtl8125_mac_ocp_write(tp, 0xF800, 0xE008);
+        rtl8125_mac_ocp_write(tp, 0xF802, 0xE01E);
+        rtl8125_mac_ocp_write(tp, 0xF804, 0xE02E);
+        rtl8125_mac_ocp_write(tp, 0xF806, 0xE054);
+        rtl8125_mac_ocp_write(tp, 0xF808, 0xE057);
+        rtl8125_mac_ocp_write(tp, 0xF80A, 0xE059);
+        rtl8125_mac_ocp_write(tp, 0xF80C, 0xE05B);
+        rtl8125_mac_ocp_write(tp, 0xF80E, 0xE05D);
+        rtl8125_mac_ocp_write(tp, 0xF810, 0x9996);
+        rtl8125_mac_ocp_write(tp, 0xF812, 0x49D1);
+        rtl8125_mac_ocp_write(tp, 0xF814, 0xF005);
+        rtl8125_mac_ocp_write(tp, 0xF816, 0x49D4);
+        rtl8125_mac_ocp_write(tp, 0xF818, 0xF10A);
+        rtl8125_mac_ocp_write(tp, 0xF81A, 0x49D8);
+        rtl8125_mac_ocp_write(tp, 0xF81C, 0xF108);
+        rtl8125_mac_ocp_write(tp, 0xF81E, 0xC00F);
+        rtl8125_mac_ocp_write(tp, 0xF820, 0x7100);
+        rtl8125_mac_ocp_write(tp, 0xF822, 0x209C);
+        rtl8125_mac_ocp_write(tp, 0xF824, 0x249C);
+        rtl8125_mac_ocp_write(tp, 0xF826, 0xC009);
+        rtl8125_mac_ocp_write(tp, 0xF828, 0x9900);
+        rtl8125_mac_ocp_write(tp, 0xF82A, 0xE004);
+        rtl8125_mac_ocp_write(tp, 0xF82C, 0xC006);
+        rtl8125_mac_ocp_write(tp, 0xF82E, 0x1900);
+        rtl8125_mac_ocp_write(tp, 0xF830, 0x9900);
+        rtl8125_mac_ocp_write(tp, 0xF832, 0xC602);
+        rtl8125_mac_ocp_write(tp, 0xF834, 0xBE00);
+        rtl8125_mac_ocp_write(tp, 0xF836, 0x5A48);
+        rtl8125_mac_ocp_write(tp, 0xF838, 0xE0C2);
+        rtl8125_mac_ocp_write(tp, 0xF83A, 0x0004);
+        rtl8125_mac_ocp_write(tp, 0xF83C, 0xE10A);
+        rtl8125_mac_ocp_write(tp, 0xF83E, 0xC60F);
+        rtl8125_mac_ocp_write(tp, 0xF840, 0x73C4);
+        rtl8125_mac_ocp_write(tp, 0xF842, 0x49B3);
+        rtl8125_mac_ocp_write(tp, 0xF844, 0xF106);
+        rtl8125_mac_ocp_write(tp, 0xF846, 0x73C2);
+        rtl8125_mac_ocp_write(tp, 0xF848, 0xC608);
+        rtl8125_mac_ocp_write(tp, 0xF84A, 0xB406);
+        rtl8125_mac_ocp_write(tp, 0xF84C, 0xC609);
+        rtl8125_mac_ocp_write(tp, 0xF84E, 0xFF80);
+        rtl8125_mac_ocp_write(tp, 0xF850, 0xC605);
+        rtl8125_mac_ocp_write(tp, 0xF852, 0xB406);
+        rtl8125_mac_ocp_write(tp, 0xF854, 0xC605);
+        rtl8125_mac_ocp_write(tp, 0xF856, 0xFF80);
+        rtl8125_mac_ocp_write(tp, 0xF858, 0x0544);
+        rtl8125_mac_ocp_write(tp, 0xF85A, 0x0568);
+        rtl8125_mac_ocp_write(tp, 0xF85C, 0xE906);
+        rtl8125_mac_ocp_write(tp, 0xF85E, 0xCDE8);
+        rtl8125_mac_ocp_write(tp, 0xF860, 0xC724);
+        rtl8125_mac_ocp_write(tp, 0xF862, 0xC624);
+        rtl8125_mac_ocp_write(tp, 0xF864, 0x9EE2);
+        rtl8125_mac_ocp_write(tp, 0xF866, 0x1E01);
+        rtl8125_mac_ocp_write(tp, 0xF868, 0x9EE0);
+        rtl8125_mac_ocp_write(tp, 0xF86A, 0x76E0);
+        rtl8125_mac_ocp_write(tp, 0xF86C, 0x49E0);
+        rtl8125_mac_ocp_write(tp, 0xF86E, 0xF1FE);
+        rtl8125_mac_ocp_write(tp, 0xF870, 0x76E6);
+        rtl8125_mac_ocp_write(tp, 0xF872, 0x486D);
+        rtl8125_mac_ocp_write(tp, 0xF874, 0x4868);
+        rtl8125_mac_ocp_write(tp, 0xF876, 0x9EE4);
+        rtl8125_mac_ocp_write(tp, 0xF878, 0x1E03);
+        rtl8125_mac_ocp_write(tp, 0xF87A, 0x9EE0);
+        rtl8125_mac_ocp_write(tp, 0xF87C, 0x76E0);
+        rtl8125_mac_ocp_write(tp, 0xF87E, 0x49E0);
+        rtl8125_mac_ocp_write(tp, 0xF880, 0xF1FE);
+        rtl8125_mac_ocp_write(tp, 0xF882, 0xC615);
+        rtl8125_mac_ocp_write(tp, 0xF884, 0x9EE2);
+        rtl8125_mac_ocp_write(tp, 0xF886, 0x1E01);
+        rtl8125_mac_ocp_write(tp, 0xF888, 0x9EE0);
+        rtl8125_mac_ocp_write(tp, 0xF88A, 0x76E0);
+        rtl8125_mac_ocp_write(tp, 0xF88C, 0x49E0);
+        rtl8125_mac_ocp_write(tp, 0xF88E, 0xF1FE);
+        rtl8125_mac_ocp_write(tp, 0xF890, 0x76E6);
+        rtl8125_mac_ocp_write(tp, 0xF892, 0x486F);
+        rtl8125_mac_ocp_write(tp, 0xF894, 0x9EE4);
+        rtl8125_mac_ocp_write(tp, 0xF896, 0x1E03);
+        rtl8125_mac_ocp_write(tp, 0xF898, 0x9EE0);
+        rtl8125_mac_ocp_write(tp, 0xF89A, 0x76E0);
+        rtl8125_mac_ocp_write(tp, 0xF89C, 0x49E0);
+        rtl8125_mac_ocp_write(tp, 0xF89E, 0xF1FE);
+        rtl8125_mac_ocp_write(tp, 0xF8A0, 0x7196);
+        rtl8125_mac_ocp_write(tp, 0xF8A2, 0xC702);
+        rtl8125_mac_ocp_write(tp, 0xF8A4, 0xBF00);
+        rtl8125_mac_ocp_write(tp, 0xF8A6, 0x5A44);
+        rtl8125_mac_ocp_write(tp, 0xF8A8, 0xEB0E);
+        rtl8125_mac_ocp_write(tp, 0xF8AA, 0x0070);
+        rtl8125_mac_ocp_write(tp, 0xF8AC, 0x00C3);
+        rtl8125_mac_ocp_write(tp, 0xF8AE, 0x1BC0);
+        rtl8125_mac_ocp_write(tp, 0xF8B0, 0xC602);
+        rtl8125_mac_ocp_write(tp, 0xF8B2, 0xBE00);
+        rtl8125_mac_ocp_write(tp, 0xF8B4, 0x0E26);
+        rtl8125_mac_ocp_write(tp, 0xF8B6, 0xC602);
+        rtl8125_mac_ocp_write(tp, 0xF8B8, 0xBE00);
+        rtl8125_mac_ocp_write(tp, 0xF8BA, 0x0EBA);
+        rtl8125_mac_ocp_write(tp, 0xF8BC, 0xC602);
+        rtl8125_mac_ocp_write(tp, 0xF8BE, 0xBE00);
+        rtl8125_mac_ocp_write(tp, 0xF8C0, 0x0000);
+        rtl8125_mac_ocp_write(tp, 0xF8C2, 0xC602);
+        rtl8125_mac_ocp_write(tp, 0xF8C4, 0xBE00);
+        rtl8125_mac_ocp_write(tp, 0xF8C6, 0x0000);
+        rtl8125_mac_ocp_write(tp, 0xF8C8, 0xC602);
+        rtl8125_mac_ocp_write(tp, 0xF8CA, 0xBE00);
+        rtl8125_mac_ocp_write(tp, 0xF8CC, 0x0000);
+
+        rtl8125_mac_ocp_write(tp, 0xFC26, 0x8000);
+
+        rtl8125_mac_ocp_write(tp, 0xFC2A, 0x0540);
+        rtl8125_mac_ocp_write(tp, 0xFC2E, 0x0E24);
+        rtl8125_mac_ocp_write(tp, 0xFC30, 0x0EB8);
+
+        rtl8125_mac_ocp_write(tp, 0xFC48, 0x001A);
+}
+
+static void
 rtl8125_hw_mac_mcu_config(struct net_device *dev)
 {
         struct rtl8125_private *tp = netdev_priv(dev);
@@ -4855,8 +4988,10 @@ rtl8125_hw_mac_mcu_config(struct net_device *dev)
 
         switch (tp->mcfg) {
         case CFG_METHOD_2:
-        case CFG_METHOD_3:
                 rtl8125_hw_disable_mac_mcu_bps(dev);
+                break;
+        case CFG_METHOD_3:
+                rtl8125_set_mac_mcu_8125a_2(dev);
                 break;
         }
 }
@@ -5956,7 +6091,7 @@ rtl8125_real_set_phy_mcu_8125_3(struct net_device *dev)
         mdio_direct_write_phy_ocp(tp, 0xA438, 0x1800);
         mdio_direct_write_phy_ocp(tp, 0xA438, 0x80a1);
         mdio_direct_write_phy_ocp(tp, 0xA438, 0x1800);
-        mdio_direct_write_phy_ocp(tp, 0xA438, 0x80a4);
+        mdio_direct_write_phy_ocp(tp, 0xA438, 0x80aa);
         mdio_direct_write_phy_ocp(tp, 0xA438, 0xd718);
         mdio_direct_write_phy_ocp(tp, 0xA438, 0x607b);
         mdio_direct_write_phy_ocp(tp, 0xA438, 0x40da);
@@ -6102,15 +6237,21 @@ rtl8125_real_set_phy_mcu_8125_3(struct net_device *dev)
         mdio_direct_write_phy_ocp(tp, 0xA438, 0xa301);
         mdio_direct_write_phy_ocp(tp, 0xA438, 0x1800);
         mdio_direct_write_phy_ocp(tp, 0xA438, 0x0648);
-        mdio_direct_write_phy_ocp(tp, 0xA438, 0xc306);
+        mdio_direct_write_phy_ocp(tp, 0xA438, 0xc520);
+        mdio_direct_write_phy_ocp(tp, 0xA438, 0xa201);
+        mdio_direct_write_phy_ocp(tp, 0xA438, 0xd701);
+        mdio_direct_write_phy_ocp(tp, 0xA438, 0x252d);
+        mdio_direct_write_phy_ocp(tp, 0xA438, 0x1646);
+        mdio_direct_write_phy_ocp(tp, 0xA438, 0xd708);
+        mdio_direct_write_phy_ocp(tp, 0xA438, 0x4006);
         mdio_direct_write_phy_ocp(tp, 0xA438, 0x1800);
-        mdio_direct_write_phy_ocp(tp, 0xA438, 0x15f8);
+        mdio_direct_write_phy_ocp(tp, 0xA438, 0x1646);
         mdio_direct_write_phy_ocp(tp, 0xA438, 0x1800);
         mdio_direct_write_phy_ocp(tp, 0xA438, 0x0308);
         mdio_direct_write_phy_ocp(tp, 0xA436, 0xA026);
         mdio_direct_write_phy_ocp(tp, 0xA438, 0x0307);
         mdio_direct_write_phy_ocp(tp, 0xA436, 0xA024);
-        mdio_direct_write_phy_ocp(tp, 0xA438, 0x15f7);
+        mdio_direct_write_phy_ocp(tp, 0xA438, 0x1645);
         mdio_direct_write_phy_ocp(tp, 0xA436, 0xA022);
         mdio_direct_write_phy_ocp(tp, 0xA438, 0x0647);
         mdio_direct_write_phy_ocp(tp, 0xA436, 0xA020);
@@ -6716,11 +6857,7 @@ rtl8125_hw_phy_config(struct net_device *dev)
                                         BIT_1
                                        );
                 mdio_direct_write_phy_ocp(tp, 0xAD4C, 0x00A8);
-                ClearAndSetEthPhyOcpBit(tp,
-                                        0xAC5C,
-                                        BIT_5|BIT_4|BIT_3,
-                                        BIT_3
-                                       );
+                mdio_direct_write_phy_ocp(tp, 0xAC5C, 0x01FF);
                 ClearAndSetEthPhyOcpBit(tp,
                                         0xAC8A,
                                         BIT_7|BIT_6|BIT_5|BIT_4,
@@ -6855,6 +6992,11 @@ rtl8125_hw_phy_config(struct net_device *dev)
 
 
                 ClearEthPhyOcpBit(tp, 0xA454, BIT_0);
+
+
+                SetEthPhyOcpBit(tp, 0xA5D4, BIT_5);
+                ClearEthPhyOcpBit(tp, 0xAD4E, BIT_4);
+                ClearEthPhyOcpBit(tp, 0xA86A, BIT_0);
 
 
                 SetEthPhyOcpBit(tp, 0xA442, BIT_11);
@@ -7007,6 +7149,17 @@ rtl8125_init_software_variable(struct net_device *dev)
                 tp->HwSuppNowIsOobVer = 1;
                 break;
         }
+
+        switch (tp->mcfg) {
+        case CFG_METHOD_2:
+        case CFG_METHOD_3:
+                tp->HwPcieSNOffset = 0x16C;
+                break;
+        }
+
+#ifdef ENABLE_REALWOW_SUPPORT
+        rtl8125_get_realwow_hw_version(dev);
+#endif //ENABLE_REALWOW_SUPPORT
 
         if (HW_DASH_SUPPORT_DASH(tp) && rtl8125_check_dash(tp))
                 tp->DASH = 1;
@@ -7991,6 +8144,18 @@ rtl8125_do_ioctl(struct net_device *dev,
                 ret = rtl8125_dash_ioctl(dev, ifr);
                 break;
 #endif
+
+#ifdef ENABLE_REALWOW_SUPPORT
+        case SIOCDEVPRIVATE_RTLREALWOW:
+                if (!netif_running(dev)) {
+                        ret = -ENODEV;
+                        break;
+                }
+
+                ret = rtl8125_realwow_ioctl(dev, ifr);
+                break;
+#endif
+
         case SIOCRTLTOOL:
                 ret = rtl8125_tool_ioctl(tp, ifr);
                 break;
@@ -8200,8 +8365,6 @@ err_out:
         goto out;
 }
 
-#define PCI_DEVICE_SERIAL_NUMBER (0x0164)
-
 static void
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4,14,0)
 rtl8125_esd_timer(unsigned long __opaque)
@@ -8243,96 +8406,113 @@ rtl8125_esd_timer(struct timer_list *t)
 
         pci_read_config_byte(pdev, PCI_COMMAND, &cmd);
         if (cmd != tp->pci_cfg_space.cmd) {
+                printk(KERN_ERR "%s: cmd = 0x%02x, should be 0x%02x \n.", dev->name, cmd, tp->pci_cfg_space.cmd);
                 pci_write_config_byte(pdev, PCI_COMMAND, tp->pci_cfg_space.cmd);
                 tp->esd_flag |= BIT_0;
         }
 
         pci_read_config_word(pdev, PCI_BASE_ADDRESS_0, &io_base_l);
         if (io_base_l != tp->pci_cfg_space.io_base_l) {
+                printk(KERN_ERR "%s: io_base_l = 0x%04x, should be 0x%04x \n.", dev->name, io_base_l, tp->pci_cfg_space.io_base_l);
                 pci_write_config_word(pdev, PCI_BASE_ADDRESS_0, tp->pci_cfg_space.io_base_l);
                 tp->esd_flag |= BIT_1;
         }
 
         pci_read_config_word(pdev, PCI_BASE_ADDRESS_2, &mem_base_l);
         if (mem_base_l != tp->pci_cfg_space.mem_base_l) {
+                printk(KERN_ERR "%s: mem_base_l = 0x%04x, should be 0x%04x \n.", dev->name, mem_base_l, tp->pci_cfg_space.mem_base_l);
                 pci_write_config_word(pdev, PCI_BASE_ADDRESS_2, tp->pci_cfg_space.mem_base_l);
                 tp->esd_flag |= BIT_2;
         }
 
         pci_read_config_word(pdev, PCI_BASE_ADDRESS_2 + 2, &mem_base_h);
         if (mem_base_h!= tp->pci_cfg_space.mem_base_h) {
+                printk(KERN_ERR "%s: mem_base_h = 0x%04x, should be 0x%04x \n.", dev->name, mem_base_h, tp->pci_cfg_space.mem_base_h);
                 pci_write_config_word(pdev, PCI_BASE_ADDRESS_2 + 2, tp->pci_cfg_space.mem_base_h);
                 tp->esd_flag |= BIT_3;
         }
 
         pci_read_config_word(pdev, PCI_BASE_ADDRESS_3, &resv_0x1c_l);
         if (resv_0x1c_l != tp->pci_cfg_space.resv_0x1c_l) {
+                printk(KERN_ERR "%s: resv_0x1c_l = 0x%04x, should be 0x%04x \n.", dev->name, resv_0x1c_l, tp->pci_cfg_space.resv_0x1c_l);
                 pci_write_config_word(pdev, PCI_BASE_ADDRESS_3, tp->pci_cfg_space.resv_0x1c_l);
                 tp->esd_flag |= BIT_4;
         }
 
         pci_read_config_word(pdev, PCI_BASE_ADDRESS_3 + 2, &resv_0x1c_h);
         if (resv_0x1c_h != tp->pci_cfg_space.resv_0x1c_h) {
+                printk(KERN_ERR "%s: resv_0x1c_h = 0x%04x, should be 0x%04x \n.", dev->name, resv_0x1c_h, tp->pci_cfg_space.resv_0x1c_h);
                 pci_write_config_word(pdev, PCI_BASE_ADDRESS_3 + 2, tp->pci_cfg_space.resv_0x1c_h);
                 tp->esd_flag |= BIT_5;
         }
 
         pci_read_config_word(pdev, PCI_BASE_ADDRESS_4, &resv_0x20_l);
         if (resv_0x20_l != tp->pci_cfg_space.resv_0x20_l) {
+                printk(KERN_ERR "%s: resv_0x20_l = 0x%04x, should be 0x%04x \n.", dev->name, resv_0x20_l, tp->pci_cfg_space.resv_0x20_l);
                 pci_write_config_word(pdev, PCI_BASE_ADDRESS_4, tp->pci_cfg_space.resv_0x20_l);
                 tp->esd_flag |= BIT_6;
         }
 
         pci_read_config_word(pdev, PCI_BASE_ADDRESS_4 + 2, &resv_0x20_h);
         if (resv_0x20_h != tp->pci_cfg_space.resv_0x20_h) {
+                printk(KERN_ERR "%s: resv_0x20_h = 0x%04x, should be 0x%04x \n.", dev->name, resv_0x20_h, tp->pci_cfg_space.resv_0x20_h);
                 pci_write_config_word(pdev, PCI_BASE_ADDRESS_4 + 2, tp->pci_cfg_space.resv_0x20_h);
                 tp->esd_flag |= BIT_7;
         }
 
         pci_read_config_word(pdev, PCI_BASE_ADDRESS_5, &resv_0x24_l);
         if (resv_0x24_l != tp->pci_cfg_space.resv_0x24_l) {
+                printk(KERN_ERR "%s: resv_0x24_l = 0x%04x, should be 0x%04x \n.", dev->name, resv_0x24_l, tp->pci_cfg_space.resv_0x24_l);
                 pci_write_config_word(pdev, PCI_BASE_ADDRESS_5, tp->pci_cfg_space.resv_0x24_l);
                 tp->esd_flag |= BIT_8;
         }
 
         pci_read_config_word(pdev, PCI_BASE_ADDRESS_5 + 2, &resv_0x24_h);
         if (resv_0x24_h != tp->pci_cfg_space.resv_0x24_h) {
+                printk(KERN_ERR "%s: resv_0x24_h = 0x%04x, should be 0x%04x \n.", dev->name, resv_0x24_h, tp->pci_cfg_space.resv_0x24_h);
                 pci_write_config_word(pdev, PCI_BASE_ADDRESS_5 + 2, tp->pci_cfg_space.resv_0x24_h);
                 tp->esd_flag |= BIT_9;
         }
 
         pci_read_config_byte(pdev, PCI_INTERRUPT_LINE, &ilr);
         if (ilr != tp->pci_cfg_space.ilr) {
+                printk(KERN_ERR "%s: ilr = 0x%02x, should be 0x%02x \n.", dev->name, ilr, tp->pci_cfg_space.ilr);
                 pci_write_config_byte(pdev, PCI_INTERRUPT_LINE, tp->pci_cfg_space.ilr);
                 tp->esd_flag |= BIT_10;
         }
 
         pci_read_config_word(pdev, PCI_SUBSYSTEM_VENDOR_ID, &resv_0x2c_l);
         if (resv_0x2c_l != tp->pci_cfg_space.resv_0x2c_l) {
+                printk(KERN_ERR "%s: resv_0x2c_l = 0x%04x, should be 0x%04x \n.", dev->name, resv_0x2c_l, tp->pci_cfg_space.resv_0x2c_l);
                 pci_write_config_word(pdev, PCI_SUBSYSTEM_VENDOR_ID, tp->pci_cfg_space.resv_0x2c_l);
                 tp->esd_flag |= BIT_11;
         }
 
         pci_read_config_word(pdev, PCI_SUBSYSTEM_VENDOR_ID + 2, &resv_0x2c_h);
         if (resv_0x2c_h != tp->pci_cfg_space.resv_0x2c_h) {
+                printk(KERN_ERR "%s: resv_0x2c_h = 0x%04x, should be 0x%04x \n.", dev->name, resv_0x2c_h, tp->pci_cfg_space.resv_0x2c_h);
                 pci_write_config_word(pdev, PCI_SUBSYSTEM_VENDOR_ID + 2, tp->pci_cfg_space.resv_0x2c_h);
                 tp->esd_flag |= BIT_12;
         }
 
-        pci_sn_l = rtl8125_csi_read(tp, PCI_DEVICE_SERIAL_NUMBER);
-        if (pci_sn_l != tp->pci_cfg_space.pci_sn_l) {
-                rtl8125_csi_write(tp, PCI_DEVICE_SERIAL_NUMBER, tp->pci_cfg_space.pci_sn_l);
-                tp->esd_flag |= BIT_13;
-        }
+        if (tp->HwPcieSNOffset > 0) {
+                pci_sn_l = rtl8125_csi_read(tp, tp->HwPcieSNOffset);
+                if (pci_sn_l != tp->pci_cfg_space.pci_sn_l) {
+                        printk(KERN_ERR "%s: pci_sn_l = 0x%08x, should be 0x%08x \n.", dev->name, pci_sn_l, tp->pci_cfg_space.pci_sn_l);
+                        rtl8125_csi_write(tp, tp->HwPcieSNOffset, tp->pci_cfg_space.pci_sn_l);
+                        tp->esd_flag |= BIT_13;
+                }
 
-        pci_sn_h = rtl8125_csi_read(tp, PCI_DEVICE_SERIAL_NUMBER + 4);
-        if (pci_sn_h != tp->pci_cfg_space.pci_sn_h) {
-                rtl8125_csi_write(tp, PCI_DEVICE_SERIAL_NUMBER + 4, tp->pci_cfg_space.pci_sn_h);
-                tp->esd_flag |= BIT_14;
+                pci_sn_h = rtl8125_csi_read(tp, tp->HwPcieSNOffset + 4);
+                if (pci_sn_h != tp->pci_cfg_space.pci_sn_h) {
+                        printk(KERN_ERR "%s: pci_sn_h = 0x%08x, should be 0x%08x \n.", dev->name, pci_sn_h, tp->pci_cfg_space.pci_sn_h);
+                        rtl8125_csi_write(tp, tp->HwPcieSNOffset + 4, tp->pci_cfg_space.pci_sn_h);
+                        tp->esd_flag |= BIT_14;
+                }
         }
 
         if (tp->esd_flag != 0) {
-                printk("esd_flag = 0x%04x\n", tp->esd_flag);
+                printk(KERN_ERR "%s: esd_flag = 0x%04x\n.\n", dev->name, tp->esd_flag);
                 netif_stop_queue(dev);
                 netif_carrier_off(dev);
                 rtl8125_hw_reset(dev);
@@ -8561,6 +8741,8 @@ rtl8125_init_one(struct pci_dev *pdev,
                 goto err_out;
 
         printk(KERN_INFO "%s: This product is covered by one or more of the following patents: US6,570,884, US6,115,776, and US6,327,625.\n", MODULENAME);
+
+        rtl8125_disable_rxdvgate(dev);
 
         device_set_wakeup_enable(&pdev->dev, tp->wol_enabled);
 
@@ -8898,6 +9080,16 @@ rtl8125_hw_config(struct net_device *dev)
                 break;
         }
 
+        //keep magic packet only
+        switch (tp->mcfg) {
+        case CFG_METHOD_2:
+        case CFG_METHOD_3:
+                mac_ocp_data = rtl8125_mac_ocp_read(tp, 0xC0B6);
+                mac_ocp_data &= ~(BIT_0);
+                rtl8125_mac_ocp_write(tp, 0xC0B6, mac_ocp_data);
+                break;
+        }
+
         rtl8125_tally_counter_addr_fill(tp);
 
         rtl8125_desc_addr_fill(tp);
@@ -9034,6 +9226,13 @@ rtl8125_hw_config(struct net_device *dev)
         switch (tp->mcfg) {
         case CFG_METHOD_2:
         case CFG_METHOD_3:
+                rtl8125_mac_ocp_write(tp, 0xE098, 0xC302);
+                break;
+        }
+
+        switch (tp->mcfg) {
+        case CFG_METHOD_2:
+        case CFG_METHOD_3:
                 if (aspm) {
                         rtl8125_init_pci_offset_99(tp);
                 }
@@ -9090,8 +9289,10 @@ rtl8125_hw_config(struct net_device *dev)
                 pci_read_config_word(pdev, PCI_BASE_ADDRESS_5 + 2, &tp->pci_cfg_space.resv_0x24_h);
                 pci_read_config_word(pdev, PCI_SUBSYSTEM_VENDOR_ID, &tp->pci_cfg_space.resv_0x2c_l);
                 pci_read_config_word(pdev, PCI_SUBSYSTEM_VENDOR_ID + 2, &tp->pci_cfg_space.resv_0x2c_h);
-                tp->pci_cfg_space.pci_sn_l = rtl8125_csi_read(tp, PCI_DEVICE_SERIAL_NUMBER);
-                tp->pci_cfg_space.pci_sn_h = rtl8125_csi_read(tp, PCI_DEVICE_SERIAL_NUMBER + 4);
+                if (tp->HwPcieSNOffset > 0) {
+                        tp->pci_cfg_space.pci_sn_l = rtl8125_csi_read(tp, tp->HwPcieSNOffset);
+                        tp->pci_cfg_space.pci_sn_h = rtl8125_csi_read(tp, tp->HwPcieSNOffset + 4);
+                }
 
                 tp->pci_cfg_is_read = 1;
         }
@@ -10480,7 +10681,7 @@ static void rtl8125_down(struct net_device *dev)
 
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2,6,11)
         /* Give a racing hard_start_xmit a few cycles to complete. */
-        synchronize_sched();  /* FIXME: should this be synchronize_irq()? */
+        synchronize_rcu();  /* FIXME: should this be synchronize_irq()? */
 #endif
 
         spin_lock_irqsave(&tp->lock, flags);
@@ -10535,6 +10736,14 @@ static int rtl8125_close(struct net_device *dev)
                                             tp->ShortPacketEmptyBufferPhy);
                         tp->ShortPacketEmptyBuffer = NULL;
                 }
+        } else {
+                spin_lock_irqsave(&tp->lock, flags);
+
+                rtl8125_hw_d3_para(dev);
+
+                rtl8125_powerdown_pll(dev);
+
+                spin_unlock_irqrestore(&tp->lock, flags);
         }
 
         return 0;

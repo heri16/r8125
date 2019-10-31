@@ -4,7 +4,7 @@
 # r8125 is the Linux device driver released for Realtek 2.5Gigabit Ethernet
 # controllers with PCI-Express interface.
 #
-# Copyright(c) 2018 Realtek Semiconductor Corp. All rights reserved.
+# Copyright(c) 2019 Realtek Semiconductor Corp. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify it
 # under the terms of the GNU General Public License as published by the Free
@@ -33,6 +33,7 @@
 
 #include <linux/ethtool.h>
 #include "r8125_dash.h"
+#include "r8125_realwow.h"
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,22)
 #define skb_transport_offset(skb) (skb->h.raw - skb->data)
@@ -314,12 +315,12 @@ do { \
 #define DASH_SUFFIX ""
 #endif
 
-#define RTL8125_VERSION "9.001.00" NAPI_SUFFIX DASH_SUFFIX
+#define RTL8125_VERSION "9.002.02" NAPI_SUFFIX DASH_SUFFIX
 #define MODULENAME "r8125"
 #define PFX MODULENAME ": "
 
 #define GPL_CLAIM "\
-r8125  Copyright (C) 2018  Realtek NIC software team <nicfae@realtek.com> \n \
+r8125  Copyright (C) 2019  Realtek NIC software team <nicfae@realtek.com> \n \
 This program comes with ABSOLUTELY NO WARRANTY; for details, please see <http://www.gnu.org/licenses/>. \n \
 This is free software, and you are welcome to redistribute it under certain conditions; see <http://www.gnu.org/licenses/>. \n"
 
@@ -1499,7 +1500,7 @@ struct rtl8125_private {
         unsigned int rtl8125_rx_config;
         u16 cp_cmd;
         u32 intr_mask;
-        u16 timer_intr_mask;
+        u32 timer_intr_mask;
         int phy_auto_nego_reg;
         int phy_1000_ctrl_reg;
         int phy_2500_ctrl_reg;
@@ -1591,6 +1592,8 @@ struct rtl8125_private {
 
         u16 phy_reg_anlpar;
 
+        u32 HwPcieSNOffset;
+
         //Dash+++++++++++++++++
         u8 HwSuppDashVer;
         u8 DASH;
@@ -1674,6 +1677,11 @@ struct rtl8125_private {
         u8 EnableDhcpTimeoutWake;
         u8 EnableTeredoOffload;
         u8 EnableKCPOffload;
+#ifdef ENABLE_REALWOW_SUPPORT
+        u32 DhcpTimeout;
+        MP_KCP_INFO MpKCPInfo;
+        //Realwow--------------
+#endif //ENABLE_REALWOW_SUPPORT
 
 #ifdef ENABLE_R8125_PROCFS
         //Procfs support
@@ -1722,7 +1730,7 @@ enum mcfg {
 
 //Ram Code Version
 #define NIC_RAMCODE_VERSION_CFG_METHOD_2 (0x0b11)
-#define NIC_RAMCODE_VERSION_CFG_METHOD_3 (0x0b26)
+#define NIC_RAMCODE_VERSION_CFG_METHOD_3 (0x0b33)
 
 //hwoptimize
 #define HW_PATCH_SOC_LAN (BIT_0)
