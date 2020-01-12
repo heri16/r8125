@@ -41,15 +41,12 @@
 #define RTL_CLOCK_RATE  3
 
 void rtl8125_eeprom_type(struct rtl8125_private *tp);
-void rtl8125_eeprom_cleanup(void __iomem *ioaddr);
+void rtl8125_eeprom_cleanup(struct rtl8125_private *tp);
 u16 rtl8125_eeprom_read_sc(struct rtl8125_private *tp, u16 reg);
 void rtl8125_eeprom_write_sc(struct rtl8125_private *tp, u16 reg, u16 data);
-void rtl8125_shift_out_bits(int data, int count, void __iomem *ioaddr);
-u16 rtl8125_shift_in_bits(void __iomem *ioaddr);
-void rtl8125_raise_clock(u8 *x, void __iomem *ioaddr);
-void rtl8125_lower_clock(u8 *x, void __iomem *ioaddr);
-void rtl8125_stand_by(void __iomem *ioaddr);
-void rtl8125_set_eeprom_sel_low(void __iomem *ioaddr);
-
-
-
+void rtl8125_shift_out_bits(struct rtl8125_private *tp, int data, int count);
+u16 rtl8125_shift_in_bits(struct rtl8125_private *tp);
+void rtl8125_raise_clock(struct rtl8125_private *tp, u8 *x);
+void rtl8125_lower_clock(struct rtl8125_private *tp, u8 *x);
+void rtl8125_stand_by(struct rtl8125_private *tp);
+void rtl8125_set_eeprom_sel_low(struct rtl8125_private *tp);
