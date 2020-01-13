@@ -1,3 +1,36 @@
+/*
+################################################################################
+#
+# r8125 is the Linux device driver released for Realtek 2.5Gigabit Ethernet
+# controllers with PCI-Express interface.
+#
+# Copyright(c) 2019 Realtek Semiconductor Corp. All rights reserved.
+#
+# This program is free software; you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by the Free
+# Software Foundation; either version 2 of the License, or (at your option)
+# any later version.
+#
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+# FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+# more details.
+#
+# You should have received a copy of the GNU General Public License along with
+# this program; if not, see <http://www.gnu.org/licenses/>.
+#
+# Author:
+# Realtek NIC software team <nicfae@realtek.com>
+# No. 2, Innovation Road II, Hsinchu Science Park, Hsinchu 300, Taiwan
+#
+################################################################################
+*/
+
+/************************************************************************************
+ *  This product is covered by one or more of the following patents:
+ *  US6,570,884, US6,115,776, and US6,327,625.
+ ***********************************************************************************/
+
 #include <linux/module.h>
 #include <linux/version.h>
 #include <linux/pci.h>
@@ -88,7 +121,7 @@ int rtl8125_tool_ioctl(struct rtl8125_private *tp, struct ifreq *ifr)
                         return -EPERM;
 
                 spin_lock_irqsave(&tp->lock, flags);
-                my_cmd.data = rtl8125_ephy_read(tp->mmio_addr, my_cmd.offset);
+                my_cmd.data = rtl8125_ephy_read(tp, my_cmd.offset);
                 spin_unlock_irqrestore(&tp->lock, flags);
 
                 if (copy_to_user(ifr->ifr_data, &my_cmd, sizeof(my_cmd))) {
@@ -103,7 +136,7 @@ int rtl8125_tool_ioctl(struct rtl8125_private *tp, struct ifreq *ifr)
                         return -EPERM;
 
                 spin_lock_irqsave(&tp->lock, flags);
-                rtl8125_ephy_write(tp->mmio_addr, my_cmd.offset, my_cmd.data);
+                rtl8125_ephy_write(tp, my_cmd.offset, my_cmd.data);
                 spin_unlock_irqrestore(&tp->lock, flags);
                 break;
 
@@ -111,7 +144,7 @@ int rtl8125_tool_ioctl(struct rtl8125_private *tp, struct ifreq *ifr)
                 my_cmd.data = 0;
                 if (my_cmd.len==1 || my_cmd.len==2 || my_cmd.len==4) {
                         spin_lock_irqsave(&tp->lock, flags);
-                        my_cmd.data = rtl8125_eri_read(tp->mmio_addr, my_cmd.offset, my_cmd.len, ERIAR_ExGMAC);
+                        my_cmd.data = rtl8125_eri_read(tp, my_cmd.offset, my_cmd.len, ERIAR_ExGMAC);
                         spin_unlock_irqrestore(&tp->lock, flags);
                 } else {
                         ret = -EOPNOTSUPP;
@@ -134,7 +167,7 @@ int rtl8125_tool_ioctl(struct rtl8125_private *tp, struct ifreq *ifr)
 
                 if (my_cmd.len==1 || my_cmd.len==2 || my_cmd.len==4) {
                         spin_lock_irqsave(&tp->lock, flags);
-                        rtl8125_eri_write(tp->mmio_addr, my_cmd.offset, my_cmd.len, my_cmd.data, ERIAR_ExGMAC);
+                        rtl8125_eri_write(tp, my_cmd.offset, my_cmd.len, my_cmd.data, ERIAR_ExGMAC);
                         spin_unlock_irqrestore(&tp->lock, flags);
                 } else {
                         ret = -EOPNOTSUPP;
@@ -297,7 +330,7 @@ int rtl8125_tool_ioctl(struct rtl8125_private *tp, struct ifreq *ifr)
                         return -EPERM;
 
                 spin_lock_irqsave(&tp->lock, flags);
-                my_cmd.data = rtl8125_mdio_prot_read_phy_ocp(tp, my_cmd.offset);
+                my_cmd.data = rtl8125_mdio_prot_direct_read_phy_ocp(tp, my_cmd.offset);
                 spin_unlock_irqrestore(&tp->lock, flags);
 
                 if (copy_to_user(ifr->ifr_data, &my_cmd, sizeof(my_cmd))) {
@@ -312,7 +345,7 @@ int rtl8125_tool_ioctl(struct rtl8125_private *tp, struct ifreq *ifr)
                         return -EPERM;
 
                 spin_lock_irqsave(&tp->lock, flags);
-                rtl8125_mdio_prot_write_phy_ocp(tp, my_cmd.offset, my_cmd.data);
+                rtl8125_mdio_prot_direct_write_phy_ocp(tp, my_cmd.offset, my_cmd.data);
                 spin_unlock_irqrestore(&tp->lock, flags);
                 break;
 
